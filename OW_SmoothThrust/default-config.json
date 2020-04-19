@@ -1,0 +1,8 @@
+{
+	"enabled": true,
+	"requireVR": false,
+	"settings": {
+		"Angler safety": true,
+		"Smoothness": 0.3
+	}
+}
