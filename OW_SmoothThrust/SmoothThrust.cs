@@ -9,26 +9,26 @@ namespace TAI_SmoothThrust
 {
 	class ThrusterModel_SmoothPatch
 	{
-		public static void Prefix(ThrusterModel __instance, ref Vector3 input)
+		public static void Prefix(ThrusterModel __instance, ref Vector3 ____translationalInput)
 		{
 			if (!SmoothThrust.container.ContainsKey(__instance))
 			{
 				SmoothThrust.container.Add(__instance, new SmoothThrust.SmoothCont());
 			}
 			SmoothThrust.SmoothCont iter = SmoothThrust.container[__instance];
-			if (OWInput.IsNewlyPressed(InputLibrary.interact, InputMode.All))
+			if (OWInput.IsNewlyPressed(InputLibrary.interact))
 			{
-				iter._prevTranslation = input;
+				iter._prevTranslation = ____translationalInput;
 				iter._buildupVelocity = Vector3.zero;
 			}
-			if (input.magnitude > 0.0001f && OWInput.IsHeld(InputLibrary.interact, 0.05f, InputMode.All))
+			if (OWInput.IsPressed(InputLibrary.interact, 0.05f))
 			{
-				iter._prevTranslation.x = Mathf.SmoothDamp(iter._prevTranslation.x, input.x, ref iter._buildupVelocity.x, SmoothThrust._analogSmoothTime);
-				iter._prevTranslation.z = Mathf.SmoothDamp(iter._prevTranslation.z, input.z, ref iter._buildupVelocity.z, SmoothThrust._analogSmoothTime);
-				iter._prevTranslation.y = Mathf.SmoothDamp(iter._prevTranslation.y, input.y, ref iter._buildupVelocity.y, SmoothThrust._analogSmoothTime);
-				input = iter._prevTranslation;
+				iter._prevTranslation.x = Mathf.SmoothDamp(iter._prevTranslation.x, ____translationalInput.x, ref iter._buildupVelocity.x, SmoothThrust._analogSmoothTime);
+				iter._prevTranslation.z = Mathf.SmoothDamp(iter._prevTranslation.z, ____translationalInput.z, ref iter._buildupVelocity.z, SmoothThrust._analogSmoothTime);
+				iter._prevTranslation.y = Mathf.SmoothDamp(iter._prevTranslation.y, ____translationalInput.y, ref iter._buildupVelocity.y, SmoothThrust._analogSmoothTime);
+				____translationalInput = iter._prevTranslation;
 			}
-			if (SmoothThrust.anglerSafety)
+			if (SmoothThrust.anglerSafety && (SmoothThrust.ShipNMBody != null || SmoothThrust.PlayerNMBody != null))
 			{
 				Vector3 myPos;
 				if (__instance is ShipThrusterModel)
@@ -55,9 +55,9 @@ namespace TAI_SmoothThrust
 				{
 					if (mindist <= 400.1f)
 					{
-						if (input.magnitude * __instance.GetMaxTranslationalThrust() >= mindist / 20f)
+						if (____translationalInput.magnitude * __instance.GetMaxTranslationalThrust() >= mindist / 20f)
 						{
-							input = input.normalized * (mindist / 21f) / __instance.GetMaxTranslationalThrust();
+							____translationalInput = ____translationalInput.normalized * (mindist / 21f) / __instance.GetMaxTranslationalThrust();
 						}
 					}
 				}
@@ -65,14 +65,14 @@ namespace TAI_SmoothThrust
 				{
 					if (mindist <= 210f)
 					{
-						if (input.magnitude * 100f * __instance.GetMaxTranslationalThrust() >= mindist * 3f)
+						if (____translationalInput.magnitude * 100f * __instance.GetMaxTranslationalThrust() >= mindist * 3f)
 						{
-							input = input.normalized * (mindist / 35f) / __instance.GetMaxTranslationalThrust();
+							____translationalInput = ____translationalInput.normalized * (mindist / 35f) / __instance.GetMaxTranslationalThrust();
 						}
 					}
 				}
 			}
-			iter._prevTranslation = input;
+			iter._prevTranslation = ____translationalInput;
 			SmoothThrust.container[__instance] = iter;
 		}
 
@@ -100,9 +100,11 @@ namespace TAI_SmoothThrust
 	{
 		private void Start()
 		{
-			ModHelper.HarmonyHelper.AddPrefix<ThrusterModel>("AddTranslationalInput", typeof(ThrusterModel_SmoothPatch), "Prefix");
+			ModHelper.HarmonyHelper.AddPrefix<ShipThrusterModel>("FireTranslationalThrusters", typeof(ThrusterModel_SmoothPatch), "Prefix");
+			ModHelper.HarmonyHelper.AddPrefix<JetpackThrusterModel>("FireTranslationalThrusters", typeof(ThrusterModel_SmoothPatch), "Prefix");
 			ModHelper.HarmonyHelper.AddPostfix<ThrusterModel>("OnDestroy", typeof(ThrusterModel_SmoothPatch), "Postfix");
 			ModHelper.HarmonyHelper.AddPostfix<AnglerfishController>("OnSectorOccupantsUpdated", typeof(ThrusterModel_SmoothPatch), "Angler_Postfix");
+			console = ModHelper.Console;
 			ModHelper.Console.WriteLine("Smooth Thrust Ready!");
 		}
 		public override void Configure(IModConfig config)
@@ -116,15 +118,18 @@ namespace TAI_SmoothThrust
 			if (LoadManager.GetCurrentScene() == OWScene.SolarSystem || LoadManager.GetCurrentScene() == OWScene.EyeOfTheUniverse)
 			{
 				if (PlayerNMBody == null)
-					PlayerNMBody = GameObject.FindObjectOfType<PlayerNoiseMaker>().GetAttachedBody();
-
+				{
+					PlayerNMBody = GameObject.FindObjectOfType<PlayerNoiseMaker>()?.GetAttachedBody();
+				}
 			}
 			else
 				PlayerNMBody = null;
 			if (LoadManager.GetCurrentScene() == OWScene.SolarSystem)
 			{
 				if (ShipNMBody == null)
-					ShipNMBody = GameObject.FindObjectOfType<ShipNoiseMaker>().GetAttachedBody();
+				{
+					ShipNMBody = GameObject.FindObjectOfType<ShipNoiseMaker>()?.GetAttachedBody();
+				}
 			}
 			else
 			{
@@ -141,6 +146,7 @@ namespace TAI_SmoothThrust
 
 		public static float limiter;
 		public static Vector3 latest;
+		public static IModConsole console;
 
 		public struct SmoothCont
 		{
